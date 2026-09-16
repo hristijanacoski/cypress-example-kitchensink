@@ -1,3 +1,154 @@
+# ToDo QA Practical Exercise - Playwright and TypeScript
+
+This fork adds automated tests for the Kitchen Sink ToDo application using Playwright, TypeScript, Page Object Model (POM), and Allure reporting.
+
+- [Repository](https://github.com/hristijanacoski/cypress-example-kitchensink)
+- [Gherkin test plan](docs/todo.feature)
+- [Playwright tests](tests/todo.spec.ts)
+- [Page object](pages/ToDoPage.ts)
+- [Test configuration](playwright.config.ts)
+- [Bug reports](https://github.com/hristijanacoski/cypress-example-kitchensink/issues)
+
+## Requirements
+
+- Git.
+- Node.js 24.15.0 or a newer 24.x release, with npm. The repository's `.node-version` selects Node 24; `package.json` specifies the supported minimum versions.
+- Java 8 or newer for the Allure 2 report generator. Configure `JAVA_HOME` to point to the Java installation and make Java available on `PATH`.
+
+Check your tools:
+
+```shell
+node --version
+npm --version
+java -version
+```
+
+## Installation
+
+Clone this fork and install the dependencies already recorded in the lockfile:
+
+```shell
+git clone https://github.com/hristijanacoski/cypress-example-kitchensink.git
+cd cypress-example-kitchensink
+npm ci
+npx playwright install chromium
+npx allure --version
+```
+
+Playwright, TypeScript, `allure-playwright`, and `allure-commandline` are already declared in `package.json`; no separate project initialization is needed.
+
+On a supported Linux host or CI runner, use `npx playwright install --with-deps chromium` to install Chromium and its system dependencies.
+
+## Run the ToDo tests
+
+```shell
+npx playwright test tests/todo.spec.ts --project=chromium
+```
+
+The Playwright `webServer` configuration starts the application automatically and waits for `http://localhost:8080/todo`. Locally, it reuses an existing server at that address.
+
+To view the browser while testing:
+
+```shell
+npx playwright test tests/todo.spec.ts --project=chromium --headed
+```
+
+To debug one scenario:
+
+```shell
+npx playwright test tests/todo.spec.ts --project=chromium -g "Save changes to a task title" --debug
+```
+
+To list the tests without running them:
+
+```shell
+npx playwright test tests/todo.spec.ts --project=chromium --list
+```
+
+The commands explicitly select `todo.spec.ts` so generated example tests are excluded. Chromium is the currently enabled browser project. The existing `npm test` and `npm run local:run` scripts run Cypress, not this Playwright suite.
+
+For manual exploration only, start the app with `npm start` and open [the ToDo page](http://localhost:8080/todo).
+
+## Test coverage and design
+
+The Gherkin plan contains 10 scenarios. The filter Scenario Outline has three examples, producing 12 Playwright tests:
+
+| Scenario | Test cases |
+| --- | ---: |
+| Create a task | 1 |
+| Reject a title containing only spaces | 1 |
+| Save an edited task title | 1 |
+| Cancel a title edit with Escape | 1 |
+| Delete one task without affecting others | 1 |
+| Complete a task and make it active again | 1 |
+| Filter by All, Active, and Completed | 3 |
+| Clear completed tasks while retaining active tasks | 1 |
+| Mark all tasks completed | 1 |
+| Preserve tasks and completion states after refresh | 1 |
+
+`pages/ToDoPage.ts` contains locators, reusable user actions, and verification helpers. `tests/todo.spec.ts` expresses the scenarios using those methods. Named `test.step()` blocks make the actions and checks visible in the reports.
+
+Playwright provides an isolated browser context for each test. A fresh application session creates two active tasks: "Pay electric bill" and "Walk the dog". The tests preserve these defaults and include them in their expected lists and counts. The remaining-task counter measures active tasks, not the total number of tasks.
+
+The Gherkin file documents the scenarios; Playwright executes the TypeScript tests. Cucumber is not required by this implementation. Persistence of a nonempty list is an explicit test expectation based on the application's local-storage implementation.
+
+## Allure reporting
+
+The `allure-playwright` reporter writes raw results to `allure-results/`. The `allure-commandline` package supplies the Allure 2 report generator.
+
+After running the tests, generate and open the report:
+
+```shell
+npx allure generate allure-results --clean -o allure-report
+npx allure open allure-report
+```
+
+Run these commands even when a test fails, so the failure remains visible in the report. Do not chain report generation to a successful test exit using `&&`.
+
+Before a new run, archive or remove only the previous `allure-results/` directory in this repository if you want a report containing only that run. Allure appends new result files to an existing directory. The generation command's `--clean` option replaces the generated report; it does not clear the raw results.
+
+The report contains test outcomes, named steps, and failure details. Failure screenshots and traces are enabled in the Playwright configuration. The separate Playwright HTML report can be opened with:
+
+```shell
+npx playwright show-report
+```
+
+Generated artifacts are excluded from Git through `.gitignore`, including `allure-results/`, `allure-report/`, `playwright-report/`, and `test-results/`. The report-generation commands should be used to recreate them after cloning.
+
+## Known defect: duplicate default-task IDs
+
+Bulk completion can leave "Walk the dog" active when the two default tasks receive the same ID. Task IDs are generated from millisecond timestamps, and update logic selects the first matching ID.
+
+In one investigation using five consecutive runs with one worker:
+
+- Four runs had duplicate default-task IDs and failed because "Walk the dog" remained unchecked.
+- One run had distinct IDs and passed.
+
+This is evidence from that investigation, not a fixed failure rate. Different execution timing can change whether the defect appears.
+
+Repeat the scenario with:
+
+```shell
+npx playwright test tests/todo.spec.ts --project=chromium -g "Mark all tasks as completed" --workers=1 --repeat-each=5
+```
+
+The test retains the expected product behavior and can fail while the defect remains. See [this fork's GitHub Issues](https://github.com/hristijanacoski/cypress-example-kitchensink/issues) for defect reports and supporting evidence.
+
+## Docker scope
+
+The inherited Docker examples below run the original Cypress suite. They do not constitute a Docker image containing this Playwright suite and its dependencies. The Playwright Docker bonus is not documented as completed here.
+
+## Further documentation
+
+- [Playwright installation](https://playwright.dev/docs/intro)
+- [Playwright Page Object Model](https://playwright.dev/docs/pom)
+- [Allure Playwright integration](https://allurereport.org/docs/playwright/)
+- [Allure 2 installation requirements](https://allurereport.org/docs/v2/install-for-nodejs/)
+
+---
+
+The original Kitchen Sink README is preserved below. Its Cypress badges, upstream links, CI descriptions, and Docker instructions describe the original example project; they are not evidence that this fork's Playwright tests or CI pass.
+
 # Kitchen Sink [![renovate-app badge][renovate-badge]][renovate-app] [![semantic-release][semantic-image] ][semantic-url]
 
 This is an example app used to showcase [Cypress.io](https://www.cypress.io/) End-to-End (E2E) testing. The application demonstrates the use of most [Cypress API commands](https://on.cypress.io/api). Additionally this example app is configured to run E2E tests in various CI platforms.
