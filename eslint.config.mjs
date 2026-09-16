@@ -9,9 +9,17 @@ import pluginYml from 'eslint-plugin-yml'
 import pluginHtml from '@html-eslint/eslint-plugin'
 
 export default defineConfig([
-  globalIgnores(['app/assets/js/{vendor,todo}/']),
+  globalIgnores([
+    'app/assets/js/vendor/**',
+    'app/assets/js/todo/**',
+    'allure-results/**',
+    'allure-report/**',
+    'playwright-report/**',
+    'test-results/**',
+    'blob-report/**',
+  ]),
   {
-    files: ['**/*.{,m}js'],
+    files: ['**/*.{js,mjs}'],
     extends: [
       js.configs.recommended,
       pluginMocha.configs.recommended,

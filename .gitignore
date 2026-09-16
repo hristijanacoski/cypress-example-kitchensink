@@ -22,3 +22,5 @@ env
 #Allure
 allure-results/
 allure-report/
+test-results/
+blob-report/
