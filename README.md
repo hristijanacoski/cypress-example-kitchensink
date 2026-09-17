@@ -134,9 +134,85 @@ npx playwright test tests/todo.spec.ts --project=chromium -g "Mark all tasks as 
 
 The test retains the expected product behavior and can fail while the defect remains. See [this fork's GitHub Issues](https://github.com/hristijanacoski/cypress-example-kitchensink/issues) for defect reports and supporting evidence.
 
-## Docker scope
+## Docker: application, tests, and reports
 
-The inherited Docker examples below run the original Cypress suite. They do not constitute a Docker image containing this Playwright suite and its dependencies. The Playwright Docker bonus is not documented as completed here.
+The Docker setup packages the application, TypeScript tests, page object, npm dependencies, Playwright browsers, and Java for Allure into one image. The host only needs Docker Desktop running with Linux containers. Node.js, browsers, and Java run inside the image.
+
+The base image is pinned to `mcr.microsoft.com/playwright:v1.63.0-noble` to match this project's Playwright version. Update both together when upgrading. See [Playwright's Docker documentation](https://playwright.dev/docs/docker).
+
+### Build the image
+
+Open PowerShell in the repository root and check that Docker's engine is running:
+
+```powershell
+docker version
+docker build -t todo-qa .
+```
+
+The first build downloads the base image and dependencies. `npm ci` installs the versions in the lockfile. `.dockerignore` excludes local dependencies, generated reports, Git history, and local environment files.
+
+### Run the tests
+
+```powershell
+docker run --name todo-qa-run --init --ipc=host todo-qa
+```
+
+The container:
+
+1. Uses the existing Playwright configuration to start the app internally on port 8080.
+2. Runs the 12 ToDo tests headlessly in Chromium with one worker and no retries.
+3. Generates the Allure report even if a test fails.
+4. Stops with a nonzero exit code if tests or report generation fail.
+
+No host port mapping is needed for the tests because the browser and application are inside the same container. The known duplicate-ID defect may cause the bulk-completion test to fail. That is a test finding, not proof that the image failed to start.
+
+The container is retained after it stops so reports can be copied out. Do not add `--rm` to this run command before exporting them.
+
+### Export reports
+
+After the container stops, run these commands even if the test command returned a failure:
+
+```powershell
+New-Item -ItemType Directory -Force -Path docker-artifacts | Out-Null
+docker cp todo-qa-run:/app/allure-report ./docker-artifacts/
+docker cp todo-qa-run:/app/allure-results ./docker-artifacts/
+docker cp todo-qa-run:/app/playwright-report ./docker-artifacts/
+docker cp todo-qa-run:/app/test-results ./docker-artifacts/
+```
+
+The `docker-artifacts/` directory is excluded from Git and from future image builds. Archive or rename this directory before exporting a subsequent run if you want to keep the runs separate.
+
+View the generated Allure report using the image itself:
+
+```powershell
+$reportPath = (Resolve-Path ./docker-artifacts/allure-report).Path
+docker run --rm --init -p 127.0.0.1:5252:5252 --mount "type=bind,source=$reportPath,target=/report,readonly" todo-qa npx serve /report --listen tcp://0.0.0.0:5252 --no-clipboard
+```
+
+Open [http://localhost:5252](http://localhost:5252) in your browser. The project's existing `serve` dependency hosts the generated static report; Allure's local preview server does not allow the container-wide listening address. This avoids requiring Java or Node.js on the host. The published port is accessible only from your computer. Press Ctrl+C to stop the report server.
+
+### Clean up and rerun
+
+After exporting the reports, remove only the stopped test container:
+
+```powershell
+docker rm todo-qa-run
+```
+
+This removes the container and its internal files, but keeps the `todo-qa` image and exported `docker-artifacts/`. You can then rerun the same `docker run` command. Rebuild the image after changing the app, tests, or dependencies.
+
+### Verification status
+
+Verified on September 17, 2026 using Docker Desktop with Linux containers:
+
+- `docker build -t todo-qa .` completed successfully.
+- The container ran all 12 ToDo tests: 12 passed, with no retries.
+- Allure report generation succeeded, and the container exited with code 0.
+- Allure results, the Allure HTML report, the Playwright HTML report, and test results were exported to `docker-artifacts/`. The exported Allure summary confirms 12 passed tests.
+
+This successful run does not resolve the intermittent duplicate-ID defect documented above; it did not reproduce during this run.
+
+The inherited Docker examples later in this README run Cypress and are separate from the Playwright workflow above.
 
 ## Further documentation
 

@@ -17,6 +17,7 @@ export default defineConfig([
     'playwright-report/**',
     'test-results/**',
     'blob-report/**',
+    'docker-artifacts/**',
   ]),
   {
     files: ['**/*.{js,mjs}'],

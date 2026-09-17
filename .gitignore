@@ -24,3 +24,6 @@ allure-results/
 allure-report/
 test-results/
 blob-report/
+
+# Exported Docker test reports
+/docker-artifacts/
